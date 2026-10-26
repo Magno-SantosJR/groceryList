@@ -1,34 +1,35 @@
 <main class="app-container">
-  <!-- Topo e Seleção de Utilizador -->
+  <!-- Topo da Aplicação & Seletor de Perfil -->
   <header class="app-header">
-    <h1>GroceryList</h1>
-    
-    <div class="user-selector">
-      <span>A utilizar:</span>
-      <button 
-        type="button" 
-        [class.active]="usuarioAtivo() === 'Magno'" 
-        (click)="selecionarUsuario('Magno')">
-        👨 Magno
-      </button>
-      <button 
-        type="button" 
-        [class.active]="usuarioAtivo() === 'Francine'" 
-        (click)="selecionarUsuario('Francine')">
-        👩 Francine
-      </button>
+    <div class="header-main">
+      <h1>GroceryList</h1>
+      
+      <div class="user-selector">
+        <button 
+          type="button" 
+          [class.active]="usuarioAtivo() === 'Magno'" 
+          (click)="selecionarUsuario('Magno')">
+          👨 Magno
+        </button>
+        <button 
+          type="button" 
+          [class.active]="usuarioAtivo() === 'Francine'" 
+          (click)="selecionarUsuario('Francine')">
+          👩 Francine
+        </button>
+      </div>
     </div>
 
-    <!-- Navegação pelas 4 Abas -->
+    <!-- Navegação pelas Abas -->
     <nav class="tabs-nav">
       <button [class.active]="abaAtiva() === 'lista'" (click)="abaAtiva.set('lista')">
-        📋 Lista
+        📋 Minha Lista
       </button>
       <button [class.active]="abaAtiva() === 'pesquisa'" (click)="abaAtiva.set('pesquisa')">
-        🏷️ Pesquisa/Compra
+        🏷️ Lançar Nota/Oferta
       </button>
       <button [class.active]="abaAtiva() === 'compras'" (click)="abaAtiva.set('compras'); carregarCompras()">
-        🧾 Compras
+        🧾 Cupons
       </button>
       <button [class.active]="abaAtiva() === 'dashboard'" (click)="abaAtiva.set('dashboard'); carregarCompras()">
         📊 Dashboard
@@ -41,9 +42,55 @@
   </datalist>
 
   <!-- ==================================================== -->
-  <!-- ABA 1: LISTA DE COMPRAS E MODO NO MERCADO            -->
+  <!-- ABA 1: LISTA DE COMPRAS COM NOVO DESIGN MODERNO      -->
   <!-- ==================================================== -->
-  <div *ngIf="abaAtiva() === 'lista'">
+  <div *ngIf="abaAtiva() === 'lista'" class="tab-content">
+    
+    <!-- Barra Superior de Procura e Adição Rápida -->
+    <div class="search-action-bar">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          placeholder="Buscar ou adicionar produto..." 
+          [ngModel]="termoBusca()"
+          (ngModelChange)="termoBusca.set($event)">
+      </div>
+      <button type="button" class="btn-novo-produto" (click)="abrirModalNovoItem(termoBusca())">
+        + Novo
+      </button>
+    </div>
+
+    <!-- Pílulas de Filtro por Categoria -->
+    <div class="category-pills">
+      <button 
+        *ngFor="let cat of categorias" 
+        [class.active]="categoriaSelecionada() === cat"
+        (click)="categoriaSelecionada.set(cat)">
+        {{ cat }}
+      </button>
+    </div>
+
+    <!-- Carrossel de Produtos Mais Frequentes (1 Toque para Adicionar) -->
+    <section class="frequentes-section" *ngIf="!modoCompras()">
+      <div class="section-title-row">
+        <h3>Mais Comprados</h3>
+        <small>Toque para adicionar à lista</small>
+      </div>
+      
+      <div class="frequentes-scroll">
+        <div 
+          *ngFor="let item of itensFrequentesFiltrados()" 
+          class="frequente-card" 
+          (click)="adicionarItemFrequente(item)">
+          <span class="frequente-icon">{{ item.icone }}</span>
+          <span class="frequente-nome">{{ item.nome }}</span>
+          <span class="frequente-badge">+ Adicionar</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Barra de Alternância do Modo Mercado -->
     <div class="actions-bar">
       <button 
         class="btn-toggle-mode" 
@@ -53,19 +100,19 @@
       </button>
     </div>
 
-    <!-- PAINEL MERCADO -->
+    <!-- PAINEL ATIVO QUANDO ESTIVER NO MERCADO -->
     <section *ngIf="modoCompras()" class="shopping-panel">
       <div class="market-header-controls">
         <div class="supermarket-choice">
-          <label for="mercado">Mercado atual:</label>
-          <select id="mercado" [(ngModel)]="supermercadoAtual">
+          <label>Mercado atual:</label>
+          <select [(ngModel)]="supermercadoAtual">
             <option *ngFor="let m of supermercadosDisponiveis" [value]="m">{{ m }}</option>
           </select>
         </div>
 
         <div class="date-choice">
-          <label for="dataCompra">Data da Compra:</label>
-          <input type="date" id="dataCompra" [(ngModel)]="dataCompraAtual">
+          <label>Data da Compra:</label>
+          <input type="date" [(ngModel)]="dataCompraAtual">
         </div>
       </div>
 
@@ -73,7 +120,7 @@
         Total no Carrinho: <strong>{{ totalCompra() | currency:'BRL':'symbol':'1.2-2' }}</strong>
       </div>
 
-      <!-- Item Extra -->
+      <!-- Inclusão de Item Extra fora da lista -->
       <div class="add-extra-box">
         <h4>+ Pegou algo fora da lista?</h4>
         <div class="extra-grid">
@@ -119,50 +166,21 @@
       </div>
     </section>
 
-    <!-- FORMULÁRIO PEDIR (CASA) -->
-    <section *ngIf="!modoCompras()" class="add-section">
-      <form (ngSubmit)="adicionarItem()" class="add-form">
-        <div class="input-group">
-          <input 
-            type="text" 
-            list="lista-produtos"
-            placeholder="O que está a faltar em casa?" 
-            [(ngModel)]="novoProdutoNome" 
-            name="produtoNome" 
-            required>
-          
-          <datalist id="lista-produtos">
-            <option *ngFor="let p of produtosCatalogo()" [value]="p.nome">{{ p.categoria }}</option>
-          </datalist>
-        </div>
-
-        <div class="inline-inputs">
-          <input type="number" min="0.1" step="0.1" placeholder="Qtd" [(ngModel)]="novaQuantidade" name="quantidade">
-          <select [(ngModel)]="novaUnidade" name="unidade">
-            <option value="un">un</option>
-            <option value="kg">kg</option>
-            <option value="pct">pct</option>
-            <option value="L">L</option>
-          </select>
-          <input type="text" placeholder="Emb. (Ex: 500g)" [(ngModel)]="novaEmbalagem" list="opcoes-embalagem" name="embalagem">
-          <input type="text" placeholder="Marca (opcional)" [(ngModel)]="novaMarca" name="marca">
-          <button type="submit" class="btn-primary">+ Pedir</button>
-        </div>
-      </form>
-    </section>
-
-    <!-- LISTAGEM DOS ITENS -->
+    <!-- LISTAGEM DOS ITENS PENDENTES / NO CARRINHO -->
     <section class="list-section">
-      <h2>{{ modoCompras() ? 'Itens para Comprar' : 'Itens em Falta' }} ({{ itensLista().length }})</h2>
+      <div class="list-header">
+        <h2>{{ modoCompras() ? 'Itens para Comprar' : 'Itens na Lista' }} ({{ itensFiltrados().length }})</h2>
+      </div>
 
-      <div *ngIf="carregando()" class="loading">A sincronizar com a base de dados...</div>
-      <div *ngIf="!carregando() && itensLista().length === 0" class="empty-state">
-        🎉 Nada pendente na lista!
+      <div *ngIf="carregando()" class="loading">A sincronizar itens...</div>
+      
+      <div *ngIf="!carregando() && itensFiltrados().length === 0" class="empty-state">
+        🎉 Nada pendente nesta categoria!
       </div>
 
       <div class="cards-grid">
         <div 
-          *ngFor="let item of itensLista()" 
+          *ngFor="let item of itensFiltrados()" 
           class="item-card"
           [class.selected-for-cart]="item.selecionado && modoCompras()"
           [class.card-extra]="item.itemExtra">
@@ -177,16 +195,25 @@
             <div class="item-info">
               <span class="item-title">
                 {{ item.produto_nome }}
-                <span *ngIf="item.itemExtra" class="badge-extra">ITEM EXTRA</span>
+                <span *ngIf="item.itemExtra" class="badge-extra">EXTRA</span>
               </span>
-              <span class="item-sub">
-                {{ item.quantidade }} {{ item.unidade_medida }}
-                <strong *ngIf="item.medida_embalagem"> • {{ item.medida_embalagem }}</strong>
-                <small *ngIf="item.marca_sugerida">({{ item.marca_sugerida }})</small>
-              </span>
+              
+              <div class="item-sub-tags">
+                <span class="badge-tag">{{ item.categoria || 'Geral' }}</span>
+                <span class="badge-tag" *ngIf="item.medida_embalagem">{{ item.medida_embalagem }}</span>
+                <span class="badge-tag brand-tag" *ngIf="item.marca_sugerida">{{ item.marca_sugerida }}</span>
+              </div>
+
               <span class="user-badge" [class.badge-francine]="item.adicionado_por === 'Francine'">
                 Pediu: {{ item.adicionado_por }}
               </span>
+            </div>
+
+            <!-- Controlo Rápido de Quantidade (+ / -) -->
+            <div class="quantity-stepper" *ngIf="!modoCompras()">
+              <button type="button" (click)="alterarQuantidade(item, -1)">−</button>
+              <span>{{ item.quantidade }} {{ item.unidade_medida }}</span>
+              <button type="button" (click)="alterarQuantidade(item, 1)">+</button>
             </div>
 
             <button 
@@ -198,6 +225,7 @@
             </button>
           </div>
 
+          <!-- Campos de Entrada Financeira no Modo Mercado -->
           <div *ngIf="modoCompras() && item.selecionado" class="card-pricing">
             <div class="pricing-inputs">
               <label>
@@ -206,7 +234,7 @@
               </label>
 
               <label>
-                Embalagem / Tamanho:
+                Embalagem / Apresentação:
                 <input type="text" [(ngModel)]="item.medida_embalagem" list="opcoes-embalagem" placeholder="Ex: 500g">
               </label>
 
@@ -223,7 +251,7 @@
 
             <div class="pricing-footer">
               <span class="ref-label" *ngIf="item.precoUnitario > 0 && item.medida_embalagem">
-                💡 Base: 
+                💡 Custo Base: 
                 <strong>
                   {{ obterReferencia(item.precoUnitario, item.desconto, item.medida_embalagem, item.quantidade).precoBase | currency:'BRL':'symbol':'1.2-2' }}
                   / {{ obterReferencia(item.precoUnitario, item.desconto, item.medida_embalagem, item.quantidade).unidadeBase }}
@@ -242,33 +270,87 @@
       </div>
     </section>
 
+    <!-- Botão Fixo no Fundo para Concluir Compra -->
     <footer *ngIf="modoCompras()" class="floating-checkout">
       <button class="btn-checkout" (click)="finalizarCompra()">
-        ✓ Concluir Compra e Gravar Histórico ({{ totalCompra() | currency:'BRL':'symbol':'1.2-2' }})
+        ✓ Concluir Compra e Gravar Cupom ({{ totalCompra() | currency:'BRL':'symbol':'1.2-2' }})
       </button>
     </footer>
   </div>
 
+  <!-- MODAL / GAVETA PARA ADICIONAR NOVO PRODUTO COM TODOS OS DADOS -->
+  <div class="modal-backdrop" *ngIf="mostrarModalNovoItem()" (click)="mostrarModalNovoItem.set(false)">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <header class="modal-header">
+        <h3>Adicionar à Lista de Falta</h3>
+        <button class="btn-close" (click)="mostrarModalNovoItem.set(false)">✕</button>
+      </header>
+
+      <form (ngSubmit)="salvarNovoItemModal()" class="modal-form">
+        <div class="form-group">
+          <label>Nome do Produto:</label>
+          <input type="text" [(ngModel)]="novoProdutoNome" name="modalNome" required placeholder="Ex: Alcatra Bovina">
+        </div>
+
+        <div class="form-group">
+          <label>Categoria:</label>
+          <select [(ngModel)]="novaCategoria" name="modalCat">
+            <option *ngFor="let c of categorias.slice(1)" [value]="c">{{ c }}</option>
+            <option value="Geral">Geral</option>
+          </select>
+        </div>
+
+        <div class="grid-2-col">
+          <div class="form-group">
+            <label>Quantidade:</label>
+            <input type="number" min="0.01" step="0.1" [(ngModel)]="novaQuantidade" name="modalQtd">
+          </div>
+          <div class="form-group">
+            <label>Unidade:</label>
+            <select [(ngModel)]="novaUnidade" name="modalUn">
+              <option value="un">unidade (un)</option>
+              <option value="kg">quilo (kg)</option>
+              <option value="pct">pacote (pct)</option>
+              <option value="L">litro (L)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2-col">
+          <div class="form-group">
+            <label>Embalagem / Apresentação:</label>
+            <input type="text" [(ngModel)]="novaEmbalagem" list="opcoes-embalagem" name="modalEmb" placeholder="Ex: 500g, 1L, 12 un">
+          </div>
+          <div class="form-group">
+            <label>Marca Sugerida:</label>
+            <input type="text" [(ngModel)]="novaMarca" name="modalMarca" placeholder="Ex: Friboi, Melitta">
+          </div>
+        </div>
+
+        <button type="submit" class="btn-modal-salvar">+ Adicionar à Lista</button>
+      </form>
+    </div>
+  </div>
+
   <!-- ==================================================== -->
-  <!-- ABA 2: REGISTRAR PREÇO / FOLHETO                     -->
+  <!-- ABA 2: REGISTAR NOTA FISCAL OU OFERTA DE FOLHETO    -->
   <!-- ==================================================== -->
   <div *ngIf="abaAtiva() === 'pesquisa'" class="pesquisa-section">
     <div class="card-pesquisa">
       <h2>Lançar Informações de Preços</h2>
 
-      <!-- Alternador de Tipo de Lançamento -->
       <div class="radio-group-tipo">
-        <label [class.active]="pesquisaOrigem === 'propaganda'">
-          <input type="radio" value="propaganda" [(ngModel)]="pesquisaOrigem" name="origem">
-          📰 Panfleto / Oferta Rápida (1 item)
-        </label>
         <label [class.active]="pesquisaOrigem === 'compra'">
           <input type="radio" value="compra" [(ngModel)]="pesquisaOrigem" name="origem">
           🛍️ Lançar Nota Fiscal Completa (Múltiplos itens)
         </label>
+        <label [class.active]="pesquisaOrigem === 'propaganda'">
+          <input type="radio" value="propaganda" [(ngModel)]="pesquisaOrigem" name="origem">
+          📰 Panfleto / Oferta Rápida (1 item)
+        </label>
       </div>
 
-      <!-- MODO A: LANÇAR CUPOM FISCAL / COMPRA ANTIGA COMPLETA -->
+      <!-- MODO A: LANÇAR NOTA FISCAL ANTIGA COM MÚLTIPLOS ITENS -->
       <div *ngIf="pesquisaOrigem === 'compra'" class="cupom-antigo-box">
         <div class="cupom-header-grid">
           <div class="form-group">
@@ -284,11 +366,11 @@
         </div>
 
         <div class="add-item-cupom-card">
-          <h4>+ Adicionar Item da Nota</h4>
+          <h4>+ Adicionar Linha da Nota Fiscal</h4>
           <div class="cupom-item-grid">
             <div class="form-group span-2">
               <label>Produto:</label>
-              <input type="text" placeholder="Ex: Cerveja Petra Origem Escura" [(ngModel)]="notaNome" list="lista-produtos">
+              <input type="text" placeholder="Ex: Cerveja Petra Origem Escura" [(ngModel)]="notaNome">
             </div>
 
             <div class="form-group">
@@ -303,7 +385,7 @@
 
             <div class="form-group">
               <label>Quantidade:</label>
-              <input type="number" min="0.01" step="1" [(ngModel)]="notaQtd">
+              <input type="number" min="0.01" step="0.01" [(ngModel)]="notaQtd">
             </div>
 
             <div class="form-group">
@@ -312,7 +394,7 @@
             </div>
 
             <div class="form-group span-2">
-              <label>Desconto Total neste produto (R$):</label>
+              <label>Desconto Total neste item (R$):</label>
               <input type="number" step="0.01" min="0" placeholder="2.40" [(ngModel)]="notaDescontoTotal">
               <small class="helper-text">
                 Subtotal calculado: 
@@ -326,9 +408,8 @@
           </button>
         </div>
 
-        <!-- LISTA DOS ITENS DIGITADOS NESTA NOTA -->
         <div class="cupom-preview" *ngIf="compraAntigaItens().length > 0">
-          <h3>Itens Lançados ({{ compraAntigaItens().length }})</h3>
+          <h3>Itens Registados ({{ compraAntigaItens().length }})</h3>
           <div class="cupom-table-container">
             <table class="cupom-table">
               <thead>
@@ -360,7 +441,7 @@
           </div>
 
           <div class="cupom-total-footer">
-            <span>Total da Compra: <strong>{{ totalCupomAntigo() | currency:'BRL':'symbol':'1.2-2' }}</strong></span>
+            <span>Total da Nota: <strong>{{ totalCupomAntigo() | currency:'BRL':'symbol':'1.2-2' }}</strong></span>
             <button class="btn-salvar-cupom" (click)="salvarCupomAntigoCompleto()">
               ✓ Concluir e Gravar Compra Inteira
             </button>
@@ -368,7 +449,7 @@
         </div>
       </div>
 
-      <!-- MODO B: OFERTA DE FOLHETO AVULSO (1 ITEM) -->
+      <!-- MODO B: OFERTA AVULSA DE PANFLETO -->
       <form *ngIf="pesquisaOrigem === 'propaganda'" (ngSubmit)="salvarPesquisaOuAvulso()" class="form-pesquisa">
         <div class="form-group">
           <label>Supermercado:</label>
@@ -384,7 +465,7 @@
 
         <div class="form-group">
           <label>Produto:</label>
-          <input type="text" list="lista-produtos" placeholder="Ex: Coxinha da Asa de Frango" [(ngModel)]="pesquisaProdutoNome" name="pesqProd" required>
+          <input type="text" placeholder="Ex: Coxinha da Asa de Frango" [(ngModel)]="pesquisaProdutoNome" name="pesqProd" required>
         </div>
 
         <div class="form-group">
@@ -414,7 +495,7 @@
   </div>
 
   <!-- ==================================================== -->
-  <!-- ABA 3: MINHAS COMPRAS (EXTRATO / CUPÕES)             -->
+  <!-- ABA 3: CUPONS DE COMPRAS FECHADAS                    -->
   <!-- ==================================================== -->
   <div *ngIf="abaAtiva() === 'compras'" class="compras-section">
     <h2>Extrato das Idas ao Supermercado</h2>
@@ -443,11 +524,11 @@
       </div>
     </div>
 
-    <!-- MODAL DO CUPOM FISCAL / DETALHES DA COMPRA -->
+    <!-- Modal Detalhe do Cupom -->
     <div class="modal-backdrop" *ngIf="compraSelecionada()" (click)="fecharDetalhesCompra()">
       <div class="modal-content" (click)="$event.stopPropagation()">
         <header class="modal-header">
-          <h3>Cupão de Compras - {{ compraSelecionada()?.supermercado }}</h3>
+          <h3>Cupom de Compras - {{ compraSelecionada()?.supermercado }}</h3>
           <button class="btn-close" (click)="fecharDetalhesCompra()">✕</button>
         </header>
 
@@ -457,7 +538,7 @@
           <p><strong>Total:</strong> {{ compraSelecionada()?.valor_total | currency:'BRL':'symbol':'1.2-2' }}</p>
         </div>
 
-        <div *ngIf="carregandoDetalhe()" class="loading">A carregar itens do cupão...</div>
+        <div *ngIf="carregandoDetalhe()" class="loading">A carregar itens do cupom...</div>
 
         <div class="itens-detalhe-list" *ngIf="!carregandoDetalhe()">
           <div *ngFor="let item of itensCompraDetalhe()" class="item-detalhe-row">
@@ -481,7 +562,6 @@
   <div *ngIf="abaAtiva() === 'dashboard'" class="dashboard-section">
     <h2>Visão Geral de Gastos</h2>
 
-    <!-- Filtro de Período -->
     <div class="periodo-filtro">
       <button [class.active]="periodoFiltro() === 'mes'" (click)="periodoFiltro.set('mes')">Mês</button>
       <button [class.active]="periodoFiltro() === 'trimestre'" (click)="periodoFiltro.set('trimestre')">Trimestre</button>
@@ -489,7 +569,6 @@
       <button [class.active]="periodoFiltro() === 'ano'" (click)="periodoFiltro.set('ano')">Ano</button>
     </div>
 
-    <!-- Cards Resumo -->
     <div class="summary-cards">
       <div class="card-metric">
         <span class="metric-title">Gasto Total no Período</span>
@@ -501,7 +580,6 @@
       </div>
     </div>
 
-    <!-- Divisão por Mercado -->
     <div class="dashboard-box">
       <h3>Gastos por Supermercado</h3>
       <div class="mercados-ranking" *ngIf="gastosPorMercado().length > 0">
@@ -513,14 +591,12 @@
       <p *ngIf="gastosPorMercado().length === 0" class="empty-state">Sem dados para este período.</p>
     </div>
 
-    <!-- Evolução de Preço de um Produto Específico -->
     <div class="dashboard-box">
       <h3>Evolução de Preço por Produto</h3>
       <div class="consulta-produto-form">
         <input 
           type="text" 
-          list="lista-produtos" 
-          placeholder="Ex: Leite, Alcatra, Café..." 
+          placeholder="Ex: Leite, Alcatra, Cerveja..." 
           [(ngModel)]="produtoConsultaGrafico">
         <button type="button" (click)="consultarEvolucaoProduto()">Pesquisar</button>
       </div>
@@ -538,9 +614,6 @@
           </div>
         </div>
       </div>
-      <p *ngIf="produtoConsultaGrafico && historicoEvolucaoProduto().length === 0" class="empty-state">
-        Nenhum registo encontrado para "{{ produtoConsultaGrafico }}".
-      </p>
     </div>
   </div>
 </main>

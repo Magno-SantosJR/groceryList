@@ -12,7 +12,6 @@ interface ItemCarrinho extends ItemLista {
   itemExtra?: boolean;
 }
 
-// Modelo para montar itens do cupom antigo
 interface ItemCupomAntigo {
   produto_nome: string;
   marca: string;
@@ -79,7 +78,6 @@ export function calcularPrecoBase(
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
-  // Navegação entre as 4 abas
   abaAtiva = signal<'lista' | 'pesquisa' | 'compras' | 'dashboard'>('lista');
   usuarioAtivo = signal<'Magno' | 'Francine'>('Magno');
 
@@ -87,15 +85,32 @@ export class App implements OnInit {
   itensLista = signal<ItemCarrinho[]>([]);
   carregando = signal<boolean>(false);
 
-  // Lista dinâmica de embalagens
+  // Categorias e Filtros Visuais
+  categorias = ['Todas', 'Hortifrúti', 'Padaria', 'Carnes', 'Laticínios', 'Bebidas', 'Mercearia', 'Limpeza', 'Higiene'];
+  categoriaSelecionada = signal<string>('Todas');
+  termoBusca = signal<string>('');
+
+  // Itens mais frequentes sugeridos com ícones rápidos
+  itensFrequentes = [
+    { nome: 'Pão Francês', categoria: 'Padaria', unidade: 'kg', embalagem: '285g', icone: '🥖' },
+    { nome: 'Leite Integral', categoria: 'Laticínios', unidade: 'L', embalagem: '1L', icone: '🥛' },
+    { nome: 'Ovos Brancos', categoria: 'Hortifrúti', unidade: 'un', embalagem: 'cx c/ 12 un', icone: '🥚' },
+    { nome: 'Café Tradicional', categoria: 'Mercearia', unidade: 'un', embalagem: '500g', icone: '☕' },
+    { nome: 'Banana Prata', categoria: 'Hortifrúti', unidade: 'kg', embalagem: '1kg', icone: '🍌' },
+    { nome: 'Arroz Branco', categoria: 'Mercearia', unidade: 'un', embalagem: '5kg', icone: '🍚' },
+    { nome: 'Papel Higiênico', categoria: 'Higiene', unidade: 'un', embalagem: 'pct c/ 12 un', icone: '🧻' }
+  ];
+
   opcoesEmbalagens = signal<string[]>([
     '500g', '700g', '1kg', '5kg',
     '350ml', '900ml', '1L', '2L',
     'pct c/ 12 un', 'pct c/ 24 un', 'pct c/ 32 un', 'cx c/ 12 un'
   ]);
 
-  // Formulário: Adicionar à Lista
+  // Controlo do modal/painel de adição detalhada
+  mostrarModalNovoItem = signal<boolean>(false);
   novoProdutoNome = '';
+  novaCategoria = 'Geral';
   novaQuantidade = 1;
   novaUnidade = 'un';
   novaMarca = '';
@@ -115,7 +130,7 @@ export class App implements OnInit {
   extraMarca = '';
   extraEmbalagem = '';
 
-  // Pesquisa / Oferta
+  // Pesquisa / Folheto
   pesquisaProdutoNome = '';
   pesquisaSupermercado = 'Koch';
   pesquisaPreco = 0;
@@ -123,20 +138,23 @@ export class App implements OnInit {
   pesquisaMarca = '';
   pesquisaEmbalagem = '';
   pesquisaData = new Date().toISOString().split('T')[0];
-  pesquisaOrigem: 'propaganda' | 'compra' = 'propaganda';
+  pesquisaOrigem: 'propaganda' | 'compra' = 'compra';
 
-  // --- LANÇAMENTO DE COMPRA ANTIGA / NOTA FISCAL COMPLETA ---
+  // Lançamento de Nota Fiscal / Compra Antiga Completa
   compraAntigaMercado = 'Koch';
   compraAntigaData = new Date().toISOString().split('T')[0];
   compraAntigaItens = signal<ItemCupomAntigo[]>([]);
 
-  // Formulário do item atual da nota
   notaNome = '';
   notaMarca = '';
-  notaEmbalagem = '350ml';
+  notaEmbalagem = '';
   notaQtd = 1;
   notaPrecoUnitario = 0;
-  notaDescontoTotal = 0; // Desconto total do item na nota (ex: 2.40 nas 6 cervejas)
+  notaDescontoTotal = 0;
+
+  totalCupomAntigo = computed(() => {
+    return this.compraAntigaItens().reduce((sum, item) => sum + item.total_liquido, 0);
+  });
 
   // Total do Carrinho
   totalCompra = computed(() => {
@@ -148,12 +166,31 @@ export class App implements OnInit {
       }, 0);
   });
 
-  // Total do cupom em digitação
-  totalCupomAntigo = computed(() => {
-    return this.compraAntigaItens().reduce((sum, item) => sum + item.total_liquido, 0);
+  // Itens da Lista Filtrados por Categoria e Busca
+  itensFiltrados = computed(() => {
+    let lista = this.itensLista();
+    const cat = this.categoriaSelecionada();
+    const busca = this.termoBusca().toLowerCase().trim();
+
+    if (cat !== 'Todas') {
+      lista = lista.filter(i => (i.categoria || 'Geral').toLowerCase() === cat.toLowerCase());
+    }
+
+    if (busca) {
+      lista = lista.filter(i => i.produto_nome.toLowerCase().includes(busca));
+    }
+
+    return lista;
   });
 
-  // Histórico de Compras Fechadas & Detalhes do Cupom
+  // Frequentes Filtrados pelo termo de pesquisa ou categoria atual
+  itensFrequentesFiltrados = computed(() => {
+    const cat = this.categoriaSelecionada();
+    if (cat === 'Todas') return this.itensFrequentes;
+    return this.itensFrequentes.filter(i => i.categoria.toLowerCase() === cat.toLowerCase());
+  });
+
+  // Histórico de Compras Fechadas & Detalhes do Cupão
   historicoCompras = signal<CompraFechada[]>([]);
   compraSelecionada = signal<CompraFechada | null>(null);
   itensCompraDetalhe = signal<RegistroPreco[]>([]);
@@ -164,7 +201,6 @@ export class App implements OnInit {
   produtoConsultaGrafico = '';
   historicoEvolucaoProduto = signal<RegistroPreco[]>([]);
 
-  // Agregações de Dashboard calculadas
   comprasFiltradasPorPeriodo = computed(() => {
     const compras = this.historicoCompras();
     const agora = new Date();
@@ -246,7 +282,7 @@ export class App implements OnInit {
       const compras = await this.supabaseService.getHistoricoCompras();
       this.historicoCompras.set(compras);
     } catch (err) {
-      console.error('Erro ao carregar histórico de compras:', err);
+      console.error('Erro ao carregar compras:', err);
     }
   }
 
@@ -262,32 +298,64 @@ export class App implements OnInit {
     }
   }
 
-  async adicionarItem() {
+  // Adicionar item frequente com apenas 1 clique
+  async adicionarItemFrequente(item: typeof this.itensFrequentes[0]) {
+    const existente = this.itensLista().find(i => i.produto_nome.toLowerCase() === item.nome.toLowerCase());
+    if (existente) {
+      this.alterarQuantidade(existente, 1);
+      return;
+    }
+
+    try {
+      await this.supabaseService.adicionarItemLista({
+        produto_nome: item.nome,
+        categoria: item.categoria,
+        quantidade: item.unidade === 'kg' ? 0.5 : 1,
+        unidade_medida: item.unidade,
+        medida_embalagem: item.embalagem,
+        adicionado_por: this.usuarioAtivo()
+      });
+      await this.carregarItensLista();
+    } catch (err) {
+      console.error('Erro ao adicionar item frequente:', err);
+    }
+  }
+
+  // Alterar quantidade (+ / -) direto no card
+  alterarQuantidade(item: ItemCarrinho, delta: number) {
+    const novaQtd = +(Math.max(0.1, Number(item.quantidade) + delta)).toFixed(2);
+    item.quantidade = novaQtd;
+  }
+
+  abrirModalNovoItem(nomeSugerido = '') {
+    this.novoProdutoNome = nomeSugerido;
+    this.novaCategoria = this.categoriaSelecionada() === 'Todas' ? 'Geral' : this.categoriaSelecionada();
+    this.novaQuantidade = 1;
+    this.novaUnidade = 'un';
+    this.novaMarca = '';
+    this.novaEmbalagem = '';
+    this.mostrarModalNovoItem.set(true);
+  }
+
+  async salvarNovoItemModal() {
     const nomeLimpo = this.novoProdutoNome.trim();
     if (!nomeLimpo) return;
 
     this.registrarOpcaoEmbalagem(this.novaEmbalagem);
 
     try {
-      const encontrado = this.produtosCatalogo().find(
-        p => p.nome.toLowerCase() === nomeLimpo.toLowerCase()
-      );
-
       await this.supabaseService.adicionarItemLista({
-        produto_id: encontrado?.id,
-        produto_nome: encontrado ? encontrado.nome : nomeLimpo,
-        categoria: encontrado?.categoria || 'Geral',
-        quantidade: this.novaQuantidade || 1,
+        produto_nome: nomeLimpo,
+        categoria: this.novaCategoria,
+        quantidade: Number(this.novaQuantidade) || 1,
         unidade_medida: this.novaUnidade || 'un',
         medida_embalagem: this.novaEmbalagem.trim() || undefined,
         marca_sugerida: this.novaMarca.trim() || undefined,
         adicionado_por: this.usuarioAtivo()
       });
 
-      this.novoProdutoNome = '';
-      this.novaQuantidade = 1;
-      this.novaMarca = '';
-      this.novaEmbalagem = '';
+      this.mostrarModalNovoItem.set(false);
+      this.termoBusca.set('');
       await this.carregarItensLista();
     } catch (err) {
       console.error('Erro ao adicionar produto:', err);
@@ -316,7 +384,6 @@ export class App implements OnInit {
     };
 
     this.itensLista.update(lista => [novoExtra, ...lista]);
-
     this.extraNome = '';
     this.extraQtd = 1;
     this.extraPreco = 0;
@@ -396,6 +463,88 @@ export class App implements OnInit {
     }
   }
 
+  // --- Lançamento de Nota Fiscal Completa ---
+  adicionarItemAoCupomAntigo() {
+    const nome = this.notaNome.trim();
+    if (!nome || !this.notaPrecoUnitario) {
+      alert('Informe ao menos o Nome e o Preço Unitário.');
+      return;
+    }
+
+    const qtd = Number(this.notaQtd) || 1;
+    const unitario = Number(this.notaPrecoUnitario) || 0;
+    const descTotal = Number(this.notaDescontoTotal) || 0;
+    const totalLiquido = +(Math.max(0, (unitario * qtd) - descTotal)).toFixed(2);
+
+    this.registrarOpcaoEmbalagem(this.notaEmbalagem);
+
+    const novoItem: ItemCupomAntigo = {
+      produto_nome: nome,
+      marca: this.notaMarca.trim(),
+      medida_embalagem: this.notaEmbalagem.trim(),
+      quantidade: qtd,
+      preco_unitario: unitario,
+      desconto_total: descTotal,
+      total_liquido: totalLiquido
+    };
+
+    this.compraAntigaItens.update(itens => [...itens, novoItem]);
+    this.notaNome = '';
+    this.notaMarca = '';
+    this.notaEmbalagem = '';
+    this.notaQtd = 1;
+    this.notaPrecoUnitario = 0;
+    this.notaDescontoTotal = 0;
+  }
+
+  removerItemDoCupomAntigo(index: number) {
+    this.compraAntigaItens.update(itens => itens.filter((_, i) => i !== index));
+  }
+
+  async salvarCupomAntigoCompleto() {
+    const itens = this.compraAntigaItens();
+    if (itens.length === 0) {
+      alert('Adicione pelo menos um item à compra.');
+      return;
+    }
+
+    try {
+      const itensFormatados = itens.map(item => {
+        const descontoPorUnidade = item.quantidade > 0 ? +(item.desconto_total / item.quantidade).toFixed(2) : 0;
+        const precoRealUnit = +(item.preco_unitario - descontoPorUnidade).toFixed(2);
+        const ref = calcularPrecoBase(precoRealUnit, item.medida_embalagem, item.quantidade);
+
+        return {
+          produto_nome: item.produto_nome,
+          categoria: 'Geral',
+          marca: item.marca,
+          medida_embalagem: item.medida_embalagem,
+          quantidade: item.quantidade,
+          preco_unitario: item.preco_unitario,
+          desconto: descontoPorUnidade,
+          preco_por_base: ref.precoBase,
+          unidade_base: ref.unidadeBase
+        };
+      });
+
+      await this.supabaseService.registrarCompraConcluida(
+        {
+          supermercado: this.compraAntigaMercado,
+          data_compra: this.compraAntigaData,
+          comprado_por: this.usuarioAtivo()
+        },
+        itensFormatados
+      );
+
+      alert(`Compra de ${this.compraAntigaMercado} registada com sucesso!`);
+      this.compraAntigaItens.set([]);
+      await this.carregarCompras();
+    } catch (err) {
+      console.error('Erro ao salvar nota fiscal:', err);
+      alert('Ocorreu um erro ao guardar o cupão.');
+    }
+  }
+
   async salvarPesquisaOuAvulso() {
     const nome = this.pesquisaProdutoNome.trim();
     if (!nome || !this.pesquisaPreco) {
@@ -425,19 +574,18 @@ export class App implements OnInit {
         data_registro: this.pesquisaData
       });
 
-      alert(`Preço registado com sucesso!`);
+      alert(`Oferta registada com sucesso!`);
       this.pesquisaProdutoNome = '';
       this.pesquisaPreco = 0;
       this.pesquisaDesconto = 0;
       this.pesquisaMarca = '';
       this.pesquisaEmbalagem = '';
     } catch (err) {
-      console.error('Erro ao registar pesquisa:', err);
-      alert('Ocorreu um erro ao guardar o preço.');
+      console.error('Erro ao registar oferta:', err);
+      alert('Ocorreu um erro ao guardar a oferta.');
     }
   }
 
-  // --- Visualização do Cupom Detalhado ---
   async abrirDetalhesCompra(compra: CompraFechada) {
     this.compraSelecionada.set(compra);
     this.carregandoDetalhe.set(true);
@@ -456,7 +604,6 @@ export class App implements OnInit {
     this.itensCompraDetalhe.set([]);
   }
 
-  // --- Consulta de Evolução no Dashboard ---
   async consultarEvolucaoProduto() {
     const nome = this.produtoConsultaGrafico.trim();
     if (!nome) return;
@@ -466,91 +613,6 @@ export class App implements OnInit {
       this.historicoEvolucaoProduto.set(registros);
     } catch (err) {
       console.error('Erro ao consultar evolução:', err);
-    }
-  }
-
-  // Adicionar linha ao cupom antigo
-  adicionarItemAoCupomAntigo() {
-    const nome = this.notaNome.trim();
-    if (!nome || !this.notaPrecoUnitario) {
-      alert('Informe ao menos o Nome e o Preço Unitário.');
-      return;
-    }
-
-    const qtd = Number(this.notaQtd) || 1;
-    const unitario = Number(this.notaPrecoUnitario) || 0;
-    const descTotal = Number(this.notaDescontoTotal) || 0;
-    const totalLiquido = +(Math.max(0, (unitario * qtd) - descTotal)).toFixed(2);
-
-    this.registrarOpcaoEmbalagem(this.notaEmbalagem);
-
-    const novoItem: ItemCupomAntigo = {
-      produto_nome: nome,
-      marca: this.notaMarca.trim(),
-      medida_embalagem: this.notaEmbalagem.trim(),
-      quantidade: qtd,
-      preco_unitario: unitario,
-      desconto_total: descTotal,
-      total_liquido: totalLiquido
-    };
-
-    this.compraAntigaItens.update(itens => [...itens, novoItem]);
-
-    // Limpa campos para o próximo item
-    this.notaNome = '';
-    this.notaMarca = '';
-    this.notaEmbalagem = '';
-    this.notaQtd = 1;
-    this.notaPrecoUnitario = 0;
-    this.notaDescontoTotal = 0;
-  }
-
-  removerItemDoCupomAntigo(index: number) {
-    this.compraAntigaItens.update(itens => itens.filter((_, i) => i !== index));
-  }
-
-  // Gravar a compra fechada no Supabase
-  async salvarCupomAntigoCompleto() {
-    const itens = this.compraAntigaItens();
-    if (itens.length === 0) {
-      alert('Adicione pelo menos um item à compra.');
-      return;
-    }
-
-    try {
-      const itensFormatados = itens.map(item => {
-        const descontoPorUnidade = item.quantidade > 0 ? +(item.desconto_total / item.quantidade).toFixed(2) : 0;
-        const precoRealUnit = +(item.preco_unitario - descontoPorUnidade).toFixed(2);
-        const ref = calcularPrecoBase(precoRealUnit, item.medida_embalagem);
-
-        return {
-          produto_nome: item.produto_nome,
-          categoria: 'Geral',
-          marca: item.marca,
-          medida_embalagem: item.medida_embalagem,
-          quantidade: item.quantidade,
-          preco_unitario: item.preco_unitario,
-          desconto: descontoPorUnidade,
-          preco_por_base: ref.precoBase,
-          unidade_base: ref.unidadeBase
-        };
-      });
-
-      await this.supabaseService.registrarCompraConcluida(
-        {
-          supermercado: this.compraAntigaMercado,
-          data_compra: this.compraAntigaData,
-          comprado_por: this.usuarioAtivo()
-        },
-        itensFormatados
-      );
-
-      alert(`Compra de ${this.compraAntigaMercado} com ${itens.length} itens gravada com sucesso!`);
-      this.compraAntigaItens.set([]);
-      await this.carregarCompras();
-    } catch (err) {
-      console.error('Erro ao salvar compra antiga:', err);
-      alert('Ocorreu um erro ao salvar o cupom.');
     }
   }
 }
