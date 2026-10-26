@@ -1,6 +1,6 @@
 {
-  "name": "marketList-pwa",
-  "short_name": "marketList-pwa",
+  "name": "groceryList-pwa",
+  "short_name": "groceryList-pwa",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

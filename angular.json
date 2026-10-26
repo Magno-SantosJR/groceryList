@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "marketList-pwa": {
+    "groceryList-pwa": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -31,12 +31,8 @@
             ],
             "styles": [
               "src/styles.scss"
-            ],
-            "server": "src/main.server.ts",
-            "outputMode": "server",
-            "ssr": {
-              "entry": "src/server.ts"
-            }
+            ]
+            //"outputMode": "server"
           },
           "configurations": {
             "production": {
@@ -67,10 +63,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "marketList-pwa:build:production"
+              "buildTarget": "groceryList-pwa:build:production"
             },
             "development": {
-              "buildTarget": "marketList-pwa:build:development"
+              "buildTarget": "groceryList-pwa:build:development"
             }
           },
           "defaultConfiguration": "development"

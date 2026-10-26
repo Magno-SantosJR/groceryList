@@ -7,7 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:marketList-pwa": "node dist/marketList-pwa/server/server.mjs"
+    "serve:ssr:groceryList-pwa": "node dist/groceryList-pwa/server/server.mjs"
   },
   "prettier": {
     "printWidth": 100,
@@ -33,6 +33,7 @@
     "@angular/router": "^20.2.0",
     "@angular/service-worker": "^20.2.0",
     "@angular/ssr": "^20.2.1",
+    "@supabase/supabase-js": "^2.118.0",
     "express": "^5.1.0",
     "firebase": "^11.10.0",
     "rxjs": "~7.8.0",
@@ -46,6 +47,7 @@
     "@types/express": "^5.0.1",
     "@types/jasmine": "~5.1.0",
     "@types/node": "^20.17.19",
+    "baseline-browser-mapping": "^2.11.33",
     "jasmine-core": "~5.9.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
