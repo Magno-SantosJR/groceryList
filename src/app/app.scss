@@ -1,3 +1,51 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Força visualmente todos os campos de texto a ficarem em CAIXA ALTA */
+input[type="text"] {
+  text-transform: uppercase;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  padding: 12px;
+  padding-bottom: 95px;
+}
+
+/* Garante que tabelas de cupom no celular tenham scroll próprio interno e não na tela toda */
+.cupom-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .btn-delete-cupom {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
+
 $primary-color: #2e7d32;
 $primary-light: #e8f5e9;
 $accent-color: #1b5e20;

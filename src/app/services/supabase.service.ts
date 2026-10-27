@@ -44,6 +44,15 @@ export class SupabaseService {
     return data;
   }
 
+  //Atualizar item existente na lista de faltas
+  async atualizarItemLista(id: string, dados: Partial<ItemLista>): Promise<void> {
+    const { error } = await this.supabase
+      .from('lista_compras')
+      .update(dados)
+      .eq('id', id);
+    if (error) throw error;
+  }
+
   async removerItemLista(id: string): Promise<void> {
     const { error } = await this.supabase
       .from('lista_compras')
@@ -134,7 +143,7 @@ export class SupabaseService {
 
     if (erroHistorico) throw erroHistorico;
 
-    // 3. Atualiza estado na lista para os itens planeados
+    // 3. Atualiza estado na lista para os itens planejados
     const idsLista = itensComprados
       .filter(i => i.itemListaId)
       .map(i => i.itemListaId!);
@@ -200,6 +209,36 @@ export class SupabaseService {
 
     if (error) throw error;
     return data || [];
+  }
+
+  // Excluir cupom fechado e todos os seus itens do histórico (em cascata)
+  async excluirCompraFechada(compraId: string): Promise<void> {
+    // 1. Remove os itens atrelados a esta compra
+    await this.supabase
+      .from('historico_precos')
+      .delete()
+      .eq('compra_id', compraId);
+
+    // 2. Remove o cabeçalho da compra
+    const { error } = await this.supabase
+      .from('compras_fechadas')
+      .delete()
+      .eq('id', compraId);
+
+    if (error) throw error;
+  }
+
+  // Buscar todas as marcas cadastradas para autocomplete
+  async getMarcasRegistradas(): Promise<string[]> {
+    const { data } = await this.supabase
+      .from('historico_precos')
+      .select('marca')
+      .not('marca', 'is', null)
+      .neq('marca', '');
+
+    if (!data) return [];
+    const marcasUnicas = Array.from(new Set(data.map(d => d.marca.trim().toUpperCase())));
+    return marcasUnicas.sort();
   }
 
   async getItensDaCompra(compraId: string): Promise<RegistroPreco[]> {

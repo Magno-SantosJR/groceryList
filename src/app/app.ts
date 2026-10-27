@@ -7,8 +7,8 @@ import { CompraFechada, ItemLista, Produto, RegistroPreco } from './models/marke
 interface ItemCarrinho extends ItemLista {
   selecionado: boolean;
   marcaComprada: string;
-  precoUnitario: number;
-  desconto: number;
+  precoUnitario: number | null;
+  desconto: number | null;
   itemExtra?: boolean;
 }
 
@@ -84,6 +84,7 @@ export class App implements OnInit {
   produtosCatalogo = signal<Produto[]>([]);
   itensLista = signal<ItemCarrinho[]>([]);
   carregando = signal<boolean>(false);
+  salvando = signal<boolean>(false);
 
   // Categorias e Filtros Visuais
   categorias = ['Todas', 'Hortifrúti', 'Padaria', 'Carnes', 'Laticínios', 'Bebidas', 'Mercearia', 'Limpeza', 'Higiene'];
@@ -107,11 +108,19 @@ export class App implements OnInit {
     'pct c/ 12 un', 'pct c/ 24 un', 'pct c/ 32 un', 'cx c/ 12 un'
   ]);
 
+  opcoesMarcas = signal<string[]>([
+    'SADIA', 'PERDIGAO', 'SEARA', 'PIRACANJUBA', 'TIROL', 
+    'MELITA', 'PILAO', 'BRAHMA', 'PETRA', 'COCA-COLA', 'PEPSI', 
+    'NESTLE', 'DANONE', 'VITAMILK', 'KRAFT', 'HEINZ', 'AMBEV', 
+    'ANGELONI', 'GIASSI', 'BISTEK', 'KOCH'
+  ]);
+
   // Controlo do modal/painel de adição detalhada
   mostrarModalNovoItem = signal<boolean>(false);
+  itemEmEdicao = signal<ItemCarrinho | null>(null);
   novoProdutoNome = '';
   novaCategoria = 'Geral';
-  novaQuantidade = 1;
+  novaQuantidade: number | null = 1;
   novaUnidade = 'un';
   novaMarca = '';
   novaEmbalagem = '';
@@ -124,17 +133,17 @@ export class App implements OnInit {
 
   // Item Extra no Carrinho
   extraNome = '';
-  extraQtd = 1;
-  extraPreco = 0;
-  extraDesconto = 0;
+  extraQtd: number | null = 1;
+  extraPreco: number | null = null;
+  extraDesconto: number | null = null;
   extraMarca = '';
   extraEmbalagem = '';
 
   // Pesquisa / Folheto
   pesquisaProdutoNome = '';
   pesquisaSupermercado = 'Koch';
-  pesquisaPreco = 0;
-  pesquisaDesconto = 0;
+  pesquisaPreco: number | null = null;
+  pesquisaDesconto: number | null = null;
   pesquisaMarca = '';
   pesquisaEmbalagem = '';
   pesquisaData = new Date().toISOString().split('T')[0];
@@ -148,9 +157,9 @@ export class App implements OnInit {
   notaNome = '';
   notaMarca = '';
   notaEmbalagem = '';
-  notaQtd = 1;
-  notaPrecoUnitario = 0;
-  notaDescontoTotal = 0;
+  notaQtd: number | null = 1;
+  notaPrecoUnitario: number | null = null;
+  notaDescontoTotal: number | null = null;
 
   totalCupomAntigo = computed(() => {
     return this.compraAntigaItens().reduce((sum, item) => sum + item.total_liquido, 0);
@@ -161,7 +170,9 @@ export class App implements OnInit {
     return this.itensLista()
       .filter(item => item.selecionado)
       .reduce((acumulado, item) => {
-        const precoReal = Math.max(0, (item.precoUnitario || 0) - (item.desconto || 0));
+        const unit = Number(item.precoUnitario) || 0;
+        const desconto = Number(item.desconto) || 0;
+        const precoReal = Math.max(0, unit - desconto);
         return acumulado + (precoReal * item.quantidade);
       }, 0);
   });
@@ -187,7 +198,7 @@ export class App implements OnInit {
   itensFrequentesFiltrados = computed(() => {
     const cat = this.categoriaSelecionada();
     if (cat === 'Todas') return this.itensFrequentes;
-    return this.itensFrequentes.filter(i => i.categoria.toLowerCase() === cat.toLowerCase());
+    return this.itensFrequentes.filter(i => i.categoria.toUpperCase() === cat.toUpperCase());
   });
 
   // Histórico de Compras Fechadas & Detalhes do Cupão
@@ -237,6 +248,7 @@ export class App implements OnInit {
     await this.carregarCatalogo();
     await this.carregarItensLista();
     await this.carregarCompras();
+    this.carregarMarcas();
 
     this.supabaseService.ouvirListaTempoReal(() => {
       this.carregarItensLista();
@@ -249,6 +261,17 @@ export class App implements OnInit {
       this.produtosCatalogo.set(produtos);
     } catch (err) {
       console.error('Erro ao carregar catálogo:', err);
+    }
+  }
+
+  async carregarMarcas() {
+    try {
+      const marcas = await this.supabaseService.getMarcasRegistradas();
+      if (marcas && marcas.length > 0) {
+        this.opcoesMarcas.update(atuais => Array.from(new Set([...atuais, ...marcas])));
+      }
+    } catch (err) {
+      console.error('Erro ao buscar marcas:', err);
     }
   }
 
@@ -298,6 +321,14 @@ export class App implements OnInit {
     }
   }
 
+  registrarOpcaoMarca(texto: string) {
+    const limpo = texto.trim().toUpperCase();
+    if (!limpo) return;
+    if (!this.opcoesMarcas().includes(limpo)) {
+      this.opcoesMarcas.update(lista => [limpo, ...lista]);
+    }
+  }
+
   // Adicionar item frequente com apenas 1 clique
   async adicionarItemFrequente(item: typeof this.itensFrequentes[0]) {
     const existente = this.itensLista().find(i => i.produto_nome.toLowerCase() === item.nome.toLowerCase());
@@ -308,7 +339,7 @@ export class App implements OnInit {
 
     try {
       await this.supabaseService.adicionarItemLista({
-        produto_nome: item.nome,
+        produto_nome: item.nome.toUpperCase(),
         categoria: item.categoria,
         quantidade: item.unidade === 'kg' ? 0.5 : 1,
         unidade_medida: item.unidade,
@@ -325,10 +356,14 @@ export class App implements OnInit {
   alterarQuantidade(item: ItemCarrinho, delta: number) {
     const novaQtd = +(Math.max(0.1, Number(item.quantidade) + delta)).toFixed(2);
     item.quantidade = novaQtd;
+    if (item.id) {
+      this.supabaseService.atualizarItemLista(item.id, { quantidade: novaQtd }).catch(console.error);
+    }
   }
 
   abrirModalNovoItem(nomeSugerido = '') {
-    this.novoProdutoNome = nomeSugerido;
+    this.itemEmEdicao.set(null);
+    this.novoProdutoNome = (nomeSugerido || '').toUpperCase();
     this.novaCategoria = this.categoriaSelecionada() === 'Todas' ? 'Geral' : this.categoriaSelecionada();
     this.novaQuantidade = 1;
     this.novaUnidade = 'un';
@@ -337,24 +372,51 @@ export class App implements OnInit {
     this.mostrarModalNovoItem.set(true);
   }
 
-  async salvarNovoItemModal() {
-    const nomeLimpo = this.novoProdutoNome.trim();
-    if (!nomeLimpo) return;
+  editarItemDaLista(item: ItemCarrinho) {
+    this.itemEmEdicao.set(item);
+    this.novoProdutoNome = item.produto_nome.toUpperCase();
+    this.novaCategoria = item.categoria || 'Geral';
+    this.novaQuantidade = item.quantidade;
+    this.novaUnidade = item.unidade_medida || 'un';
+    this.novaMarca = (item.marca_sugerida || '').toUpperCase();
+    this.novaEmbalagem = item.medida_embalagem || '';
+    this.mostrarModalNovoItem.set(true);
+  }
 
+  async salvarNovoItemModal() {
+    const nomeLimpo = this.novoProdutoNome.trim().toUpperCase();
+    if (!nomeLimpo || this.salvando()) return;
+
+    const marcaLimpa = this.novaMarca.trim().toUpperCase();
+    this.registrarOpcaoMarca(marcaLimpa);
     this.registrarOpcaoEmbalagem(this.novaEmbalagem);
 
+    this.salvando.set(true);
     try {
-      await this.supabaseService.adicionarItemLista({
-        produto_nome: nomeLimpo,
-        categoria: this.novaCategoria,
-        quantidade: Number(this.novaQuantidade) || 1,
-        unidade_medida: this.novaUnidade || 'un',
-        medida_embalagem: this.novaEmbalagem.trim() || undefined,
-        marca_sugerida: this.novaMarca.trim() || undefined,
-        adicionado_por: this.usuarioAtivo()
-      });
+      const editando = this.itemEmEdicao();
+      if (editando && editando.id) {
+        await this.supabaseService.atualizarItemLista(editando.id, {
+          produto_nome: nomeLimpo,
+          categoria: this.novaCategoria,
+          quantidade: Number(this.novaQuantidade) || 1,
+          unidade_medida: this.novaUnidade || 'un',
+          medida_embalagem: this.novaEmbalagem.trim() || undefined,
+          marca_sugerida: this.novaMarca.trim() || undefined
+        });
+      } else {
+        await this.supabaseService.adicionarItemLista({
+          produto_nome: nomeLimpo,
+          categoria: this.novaCategoria,
+          quantidade: Number(this.novaQuantidade) || 1,
+          unidade_medida: this.novaUnidade || 'un',
+          medida_embalagem: this.novaEmbalagem.trim() || undefined,
+          marca_sugerida: this.novaMarca.trim() || undefined,
+          adicionado_por: this.usuarioAtivo()
+        });
+      }
 
       this.mostrarModalNovoItem.set(false);
+      this.salvando.set(false);
       this.termoBusca.set('');
       await this.carregarItensLista();
     } catch (err) {
@@ -363,9 +425,11 @@ export class App implements OnInit {
   }
 
   adicionarItemExtraNoCarrinho() {
-    const nome = this.extraNome.trim();
-    if (!nome) return;
+    const nome = this.extraNome.trim().toUpperCase();
+    if (!nome) return;]
 
+    const marca = this.extraMarca.trim().toUpperCase();
+    this.registrarOpcaoMarca(marca);
     this.registrarOpcaoEmbalagem(this.extraEmbalagem);
 
     const novoExtra: ItemCarrinho = {
@@ -377,7 +441,7 @@ export class App implements OnInit {
       adicionado_por: this.usuarioAtivo(),
       status: 'pendente',
       selecionado: true,
-      marcaComprada: this.extraMarca.trim(),
+      marcaComprada: marca,
       precoUnitario: Number(this.extraPreco) || 0,
       desconto: Number(this.extraDesconto) || 0,
       itemExtra: true
@@ -386,8 +450,8 @@ export class App implements OnInit {
     this.itensLista.update(lista => [novoExtra, ...lista]);
     this.extraNome = '';
     this.extraQtd = 1;
-    this.extraPreco = 0;
-    this.extraDesconto = 0;
+    this.extraPreco = null;
+    this.extraDesconto = null;
     this.extraMarca = '';
     this.extraEmbalagem = '';
   }
@@ -410,35 +474,39 @@ export class App implements OnInit {
     this.modoCompras.update(valor => !valor);
   }
 
-  obterReferencia(precoUnitario: number, desconto: number, embalagem?: string, qtd?: number) {
+  obterReferencia(precoUnitario: number | null, desconto: number | null, embalagem?: string, qtd?: number) {
     const final = Math.max(0, (precoUnitario || 0) - (desconto || 0));
     return calcularPrecoBase(final, embalagem || '', qtd);
   }
 
   async finalizarCompra() {
+    if(this.salvando()) return;
     const selecionados = this.itensLista().filter(item => item.selecionado);
     if (selecionados.length === 0) {
       alert('Selecione pelo menos um item comprado antes de finalizar.');
       return;
     }
 
+    this.salvando.set(true);
     try {
       const itensFormatados = selecionados.map(item => {
+        const precoUnit = Number(item.precoUnitario) || 0;
+        const desc = Number(item.desconto) || 0;
         const ref = calcularPrecoBase(
-          Math.max(0, (item.precoUnitario || 0) - (item.desconto || 0)),
+          Math.max(0, precoUnit - desc),
           item.medida_embalagem || '',
           item.quantidade
         );
 
         return {
           itemListaId: item.itemExtra ? undefined : item.id,
-          produto_nome: item.produto_nome,
+          produto_nome: item.produto_nome.toUpperCase(),
           categoria: item.categoria,
-          marca: item.marcaComprada,
+          marca: (item.marcaComprada || '').toUpperCase(),
           medida_embalagem: item.medida_embalagem,
           quantidade: item.quantidade,
-          preco_unitario: Number(item.precoUnitario) || 0,
-          desconto: Number(item.desconto) || 0,
+          preco_unitario: precoUnit,
+          desconto: desc,
           preco_por_base: ref.precoBase,
           unidade_base: ref.unidadeBase
         };
@@ -460,27 +528,32 @@ export class App implements OnInit {
     } catch (err) {
       console.error('Erro ao concluir compra:', err);
       alert('Erro ao gravar a compra.');
+    } finally {
+      this.salvando.set(false);
     }
   }
 
   // --- Lançamento de Nota Fiscal Completa ---
   adicionarItemAoCupomAntigo() {
-    const nome = this.notaNome.trim();
-    if (!nome || !this.notaPrecoUnitario) {
+    const nome = this.notaNome.trim().toUpperCase();
+    const unitario = Number(this.notaPrecoUnitario) || 0;
+
+    if (!nome || unitario <= 0) {
       alert('Informe ao menos o Nome e o Preço Unitário.');
       return;
     }
 
     const qtd = Number(this.notaQtd) || 1;
-    const unitario = Number(this.notaPrecoUnitario) || 0;
     const descTotal = Number(this.notaDescontoTotal) || 0;
     const totalLiquido = +(Math.max(0, (unitario * qtd) - descTotal)).toFixed(2);
+    const marca = this.notaMarca.trim().toUpperCase();
 
+    this.registrarOpcaoMarca(marca);
     this.registrarOpcaoEmbalagem(this.notaEmbalagem);
 
     const novoItem: ItemCupomAntigo = {
       produto_nome: nome,
-      marca: this.notaMarca.trim(),
+      marca: marca,
       medida_embalagem: this.notaEmbalagem.trim(),
       quantidade: qtd,
       preco_unitario: unitario,
@@ -493,8 +566,8 @@ export class App implements OnInit {
     this.notaMarca = '';
     this.notaEmbalagem = '';
     this.notaQtd = 1;
-    this.notaPrecoUnitario = 0;
-    this.notaDescontoTotal = 0;
+    this.notaPrecoUnitario = null;
+    this.notaDescontoTotal = null;
   }
 
   removerItemDoCupomAntigo(index: number) {
@@ -502,12 +575,14 @@ export class App implements OnInit {
   }
 
   async salvarCupomAntigoCompleto() {
+    if(this.salvando()) return;
     const itens = this.compraAntigaItens();
     if (itens.length === 0) {
       alert('Adicione pelo menos um item à compra.');
       return;
     }
 
+    this.salvando.set(true);
     try {
       const itensFormatados = itens.map(item => {
         const descontoPorUnidade = item.quantidade > 0 ? +(item.desconto_total / item.quantidade).toFixed(2) : 0;
@@ -515,9 +590,9 @@ export class App implements OnInit {
         const ref = calcularPrecoBase(precoRealUnit, item.medida_embalagem, item.quantidade);
 
         return {
-          produto_nome: item.produto_nome,
+          produto_nome: item.produto_nome.toUpperCase(),
           categoria: 'Geral',
-          marca: item.marca,
+          marca: item.marca.toUpperCase(),
           medida_embalagem: item.medida_embalagem,
           quantidade: item.quantidade,
           preco_unitario: item.preco_unitario,
@@ -541,32 +616,40 @@ export class App implements OnInit {
       await this.carregarCompras();
     } catch (err) {
       console.error('Erro ao salvar nota fiscal:', err);
-      alert('Ocorreu um erro ao guardar o cupão.');
+      alert('Ocorreu um erro ao guardar o cupom.');
+    } finally {
+      this.salvando.set(false);
     }
   }
 
   async salvarPesquisaOuAvulso() {
     const nome = this.pesquisaProdutoNome.trim();
-    if (!nome || !this.pesquisaPreco) {
+    const preco = Number(this.pesquisaPreco) || 0;
+
+    if (!nome || preco <= 0) {
       alert('Preencha o Nome do Produto e o Preço.');
       return;
     }
 
+    const marca = this.pesquisaMarca.trim().toUpperCase();
+    const desc = Number(this.pesquisaDesconto) || 0;
+
+    this.registrarOpcaoMarca(marca);
     this.registrarOpcaoEmbalagem(this.pesquisaEmbalagem);
 
     const ref = calcularPrecoBase(
-      Math.max(0, this.pesquisaPreco - (this.pesquisaDesconto || 0)),
+      Math.max(0, preco - desc),
       this.pesquisaEmbalagem
     );
 
     try {
       await this.supabaseService.registrarPrecoAvulso({
         produto_nome: nome,
-        marca: this.pesquisaMarca.trim(),
+        marca: marca,
         medida_embalagem: this.pesquisaEmbalagem.trim(),
         supermercado: this.pesquisaSupermercado,
-        preco_unitario: Number(this.pesquisaPreco),
-        desconto: Number(this.pesquisaDesconto) || 0,
+        preco_unitario: preco,
+        desconto: desc,
         preco_por_base: ref.precoBase,
         unidade_base: ref.unidadeBase,
         tipo_origem: this.pesquisaOrigem,
@@ -583,6 +666,8 @@ export class App implements OnInit {
     } catch (err) {
       console.error('Erro ao registar oferta:', err);
       alert('Ocorreu um erro ao guardar a oferta.');
+    } finally {
+      this.salvando.set(false);
     }
   }
 
@@ -602,6 +687,27 @@ export class App implements OnInit {
   fecharDetalhesCompra() {
     this.compraSelecionada.set(null);
     this.itensCompraDetalhe.set([]);
+  }
+
+  async excluirCupom(compra: CompraFechada) {
+    if (!confirm(`Deseja realmente excluir a compra de ${compra.supermercado} em ${compra.data_compra}?`)) {
+      return;
+    }
+
+    if (this.salvando()) return;
+    this.salvando.set(true);
+
+    try {
+      await this.supabaseService.excluirCompraFechada(compra.id);
+      this.fecharDetalhesCompra();
+      await this.carregarCompras();
+      alert('Cupom excluído com sucesso!');
+    } catch (err) {
+      console.error('Erro ao excluir cupom:', err);
+      alert('Ocorreu um erro ao excluir o cupom.');
+    } finally {
+      this.salvando.set(false);
+    }
   }
 
   async consultarEvolucaoProduto() {
