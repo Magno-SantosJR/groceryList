@@ -29,7 +29,7 @@
         🏷️ Lançar Nota/Oferta
       </button>
       <button [class.active]="abaAtiva() === 'compras'" (click)="abaAtiva.set('compras'); carregarCompras()">
-        🧾 Cupões
+        🧾 Cupons
       </button>
       <button [class.active]="abaAtiva() === 'dashboard'" (click)="abaAtiva.set('dashboard'); carregarCompras()">
         📊 Dashboard
@@ -547,7 +547,7 @@
   </div>
 
   <!-- ==================================================== -->
-  <!-- ABA 3: CUPÕES DE COMPRAS FECHADAS                    -->
+  <!-- ABA 3: CUPONS DE COMPRAS FECHADAS                    -->
   <!-- ==================================================== -->
   <div *ngIf="abaAtiva() === 'compras'" class="compras-section">
     <h2>Extrato das Idas ao Supermercado</h2>
@@ -576,14 +576,14 @@
       </div>
     </div>
 
-    <!-- Modal Detalhe do Cupão com Botão de Excluir -->
+    <!-- Modal Detalhe do Cupom com Botão de Excluir -->
     <div class="modal-backdrop" *ngIf="compraSelecionada()" (click)="fecharDetalhesCompra()">
       <div class="modal-content" (click)="$event.stopPropagation()">
         <header class="modal-header">
-          <h3>Cupão de Compras - {{ compraSelecionada()?.supermercado }}</h3>
+          <h3>Cupom de Compras - {{ compraSelecionada()?.supermercado }}</h3>
           <div class="modal-header-actions">
-            <button type="button" class="btn-delete-cupom" (click)="excluirCupom(compraSelecionada()!)" title="Apagar este cupão">
-              🗑️ Apagar Cupão
+            <button type="button" class="btn-delete-cupom" (click)="excluirCupom(compraSelecionada()!)" title="Apagar este cupom">
+              🗑️ Apagar Cupom
             </button>
             <button type="button" class="btn-close" (click)="fecharDetalhesCompra()">✕</button>
           </div>
@@ -595,7 +595,7 @@
           <p><strong>Total:</strong> {{ compraSelecionada()?.valor_total | currency:'BRL':'symbol':'1.2-2' }}</p>
         </div>
 
-        <div *ngIf="carregandoDetalhe()" class="loading">A carregar itens do cupão...</div>
+        <div *ngIf="carregandoDetalhe()" class="loading">A carregar itens do cupom...</div>
 
         <div class="itens-detalhe-list" *ngIf="!carregandoDetalhe()">
           <div *ngFor="let item of itensCompraDetalhe()" class="item-detalhe-row">
@@ -609,7 +609,7 @@
             </div>
           </div>
           <p *ngIf="itensCompraDetalhe().length === 0" class="empty-state">
-            Nenhum detalhe de itens registado para este cupão.
+            Nenhum detalhe de itens registado para este cupom.
           </p>
         </div>
       </div>
