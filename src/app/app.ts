@@ -426,7 +426,7 @@ export class App implements OnInit {
 
   adicionarItemExtraNoCarrinho() {
     const nome = this.extraNome.trim().toUpperCase();
-    if (!nome) return;]
+    if (!nome) return;
 
     const marca = this.extraMarca.trim().toUpperCase();
     this.registrarOpcaoMarca(marca);
