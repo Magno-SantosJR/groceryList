@@ -74,7 +74,7 @@ export class SupabaseService {
       .subscribe();
   }
 
-  // --- FINALIZAR COMPRA COMPLETA (MESTRE / DETALHE) ---
+  // --- FINALIZAR COMPRA COMPLETA (MOSTRAR DETALHES / GARANTINDO O VINCULO DO COMPRA_ID) ---
   async registrarCompraConcluida(
     dadosCompra: {
       supermercado: string;
@@ -102,46 +102,60 @@ export class SupabaseService {
 
     const quantidadeTotalItens = itensComprados.reduce((soma, i) => soma + (i.quantidade || 1), 0);
 
-    // 1. Cria a compra mestre
+    // 1. Cria a compra mestre e retorna o registro gerado
     const { data: compraCriada, error: erroCompra } = await this.supabase
       .from('compras_fechadas')
       .insert([{
         supermercado: dadosCompra.supermercado,
         data_compra: dadosCompra.data_compra,
         valor_total: +valorTotal.toFixed(2),
-        quantidade_itens: quantidadeTotalItens,
+        quantidade_itens: quantidadeTotalItens.toFixed(2),
         comprado_por: dadosCompra.comprado_por,
         forma_pagamento: dadosCompra.forma_pagamento || 'Cartão'
       }])
-      .select()
+      .select('*')
       .single();
 
-    if (erroCompra) throw erroCompra;
+    if (erroCompra) {
+      console.error('Erro ao registrar compra concluída:', erroCompra);
+      throw erroCompra;
+    }
+
+    if (!compraCriada || !compraCriada.id) {
+      throw new Error('Falha ao obter o ID da compra fechada.');
+    }
 
     // 2. Insere os itens vinculados à compra
-    const registrosHistorico: Partial<RegistroPreco>[] = itensComprados.map(i => ({
-      compra_id: compraCriada.id,
-      produto_nome: i.produto_nome,
-      categoria: i.categoria || 'Geral',
-      marca: i.marca || '',
-      medida_embalagem: i.medida_embalagem || '',
-      quantidade: i.quantidade || 1,
-      preco_unitario: i.preco_unitario,
-      desconto: i.desconto || 0,
-      preco_final: +(i.preco_unitario - (i.desconto || 0)).toFixed(2),
-      preco_por_base: i.preco_por_base,
-      unidade_base: i.unidade_base || 'un',
-      supermercado: dadosCompra.supermercado,
-      tipo_origem: 'compra',
-      registrado_por: dadosCompra.comprado_por,
-      data_registro: dadosCompra.data_compra
-    }));
+    const registrosHistorico: Partial<RegistroPreco>[] = itensComprados.map(i => {
+      const unit = Number(i.preco_unitario) || 0;
+      const desc = Number(i.desconto) || 0;
+      return {
+        compra_id: compraCriada.id,
+        produto_nome: i.produto_nome,
+        categoria: i.categoria || 'Geral',
+        marca: i.marca || '',
+        medida_embalagem: i.medida_embalagem || '',
+        quantidade: i.quantidade || 1,
+        preco_unitario: i.preco_unitario,
+        desconto: i.desconto || 0,
+        preco_final: +(i.preco_unitario - (i.desconto || 0)).toFixed(2),
+        preco_por_base: i.preco_por_base,
+        unidade_base: i.unidade_base || 'un',
+        supermercado: dadosCompra.supermercado,
+        tipo_origem: 'compra',
+        registrado_por: dadosCompra.comprado_por,
+        data_registro: dadosCompra.data_compra
+      };
+    });
 
     const { error: erroHistorico } = await this.supabase
       .from('historico_precos')
       .insert(registrosHistorico);
 
-    if (erroHistorico) throw erroHistorico;
+    if (erroHistorico) {
+      console.error('Erro ao inserir histórico de preços:', erroHistorico);
+      throw erroHistorico;
+    }
 
     // 3. Atualiza estado na lista para os itens planejados
     const idsLista = itensComprados
@@ -154,7 +168,10 @@ export class SupabaseService {
         .update({ status: 'comprado' })
         .in('id', idsLista);
 
-      if (erroUpdate) throw erroUpdate;
+      if (erroUpdate) {
+        console.error('Erro ao atualizar status da lista de compras:', erroUpdate);
+        throw erroUpdate;
+      }
     }
   }
 
@@ -241,14 +258,18 @@ export class SupabaseService {
     return marcasUnicas.sort();
   }
 
+  // --- BUSCAR ITENS DE UMA COMPRA ESPECÍFICA ---
   async getItensDaCompra(compraId: string): Promise<RegistroPreco[]> {
     const { data, error } = await this.supabase
       .from('historico_precos')
       .select('*')
       .eq('compra_id', compraId)
-      .order('produto_nome');
+      .order('produto_nome', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro ao buscar itens da compra:', error);
+      throw error;
+    }
     return data || [];
   }
 
